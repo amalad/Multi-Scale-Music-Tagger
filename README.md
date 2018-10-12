@@ -1,4 +1,4 @@
-# MS_Music_Tagger
+# Multi Scale Music Tagger
 A Multi Scale Convolutional Neural Network Architecture for Music Auto-Tagging
 
 Model developed and implemented for the Study Oriented Project Course (CS F266), Jan 2017 - April 2017.
