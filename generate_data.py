@@ -30,7 +30,7 @@ def filter_tags(n_tags, annotations_file_path, write_path):
 	pickle.dump((ids, tags, paths), open(write_path, "wb"))
 	print("Done")
 
-def generate_spectrograms(file_paths, print_every=5, use_numpy=True, compress=False):
+def generate_spectrograms(file_paths, ind, checkpoint, print_every=100, use_numpy=True, compress=False):
 	"""
 	Generates spectrograms for audio data
 	:param file_paths: List of paths of audio files
@@ -40,24 +40,27 @@ def generate_spectrograms(file_paths, print_every=5, use_numpy=True, compress=Fa
 	"""
 	print("Generating spectrograms....")
 	specs = []
+	count = 0
 	for index, path in enumerate(file_paths):
-	    if index in config.DELETE:
-	        specs.append(np.zeros((128, 628), dtype=_type))
+	    count += 1
+	    if (checkpoint + index) in config.DELETE:
+	        specs.append(np.zeros((128, 628), dtype=np.float32))
 	        continue
 	    signal, rate = librosa.load("data/" + path, sr=config.SR)
 	    specs.append(np.log(np.clip(librosa.feature.melspectrogram(signal, rate), config.EPS, np.inf)).astype(np.float32))
 	    if (index + 1) % print_every == 0:
 	        print("{} spectrograms calculated".format(index + 1))
-	print("Done")
+	print("Done: " + str(count))
 	specs = np.array(specs)
 	print("Dumping spectrograms....")
+	spec_path = config.DATA_PATH + "Spectrograms" + str(ind) + ".data"
 	if not use_numpy:
-	    pickle.dump(specs, gzip.open("data/Spectrograms.data", "wb") if compress else open("data/Spectrograms.data", "wb"))
+	    pickle.dump(specs, gzip.open(spec_path, "wb") if compress else open(spec_path, "wb"))
 	else:
 	    if compress:
-	        np.savez_compressed(open("data/Spectrograms.data", "wb"), specs)
+	        np.savez_compressed(open(spec_path, "wb"), specs)
 	    else:
-	        np.save(open("data/Spectrograms.data", "wb"), specs)
+	        np.save(open(spec_path, "wb"), specs)
 	print("Done")
 
 if __name__ == "__main__":
@@ -71,4 +74,12 @@ if __name__ == "__main__":
 	print("Done")
 
 	# Generate Spectrograms
-	generate_spectrograms(paths)
+	# generate_spectrograms(paths)
+
+	checkpoints = [0, 5000, 10000, 15000, 20000, 25000, 25863]
+	# Generate Spectrograms
+	for ind, checkpoint in enumerate(checkpoints[:-1]):
+		if ind < 4:
+			continue
+		print(ind, checkpoint, checkpoints[ind + 1], ":")
+		generate_spectrograms(paths[checkpoint: checkpoints[ind + 1]], ind + 1, checkpoint)
