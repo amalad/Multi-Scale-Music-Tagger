@@ -8,8 +8,8 @@ import config
 
 def read_annotations(annotations_file_path):
 	"""
-	Prunes tags by frequency
-	:param annotations_file_path: Path of original annotations file
+	Reads the raw annotations file
+	:param annotations_file_path: Path of raw annotations file
 	:return: IDs of data instances, Names of tags, frequencies of tags, tags annotations for data, paths of audio
 	clips (all in decreasing order of tag frequencies)
 	"""
