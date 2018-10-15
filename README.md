@@ -34,4 +34,4 @@ Corresponding test AUC score: 0.9045
 Note: Since we're splitting the dataset randomly in our "train_music_tagger.py" script, these scores may vary on each run. For most of our runs, the best validation score and corresponding test AUC score were between 0.90 and 0.91.
 
 ## Contact:
-For any questions about the model or the pretrained weights and training logs for the scores reported above, feel free to ping me.
+Feel free to ping me if you need the pretrained weights, the training logs for the reported scores or if you have any questions about the model.
