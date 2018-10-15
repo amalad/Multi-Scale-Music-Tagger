@@ -8,7 +8,8 @@ Project by: Amala Deshmukh and [Tanmaya Dabral](https://github.com/many-facedgod
 ## Requirements
 1. Python 3.6 
 2. PyTorch 0.4.1 
-3. Librosa 0.6.2 (Required for generating spectrograms)
+3. Librosa 0.6.2 (Required for generating spectrograms) 
+
 Check "requirements.txt".
 
 ## Downloading and Processing the Data:
