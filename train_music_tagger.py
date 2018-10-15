@@ -1,9 +1,11 @@
 import numpy as np
+from sklearn.metrics import roc_auc_score
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
+import pickle
 import time
 
 from mscnn import MSCNN
@@ -25,7 +27,7 @@ class MusicDataset(Dataset):
 def weight_init(m):
 	if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
 		nn.init.xavier_normal_(m.weight)
-		nn.init.xavier_normal_(m.bias)
+		nn.init.constant_(m.bias, 0)
 
 
 def train(train_loader, valid_loader, weight_init=None):
@@ -35,11 +37,12 @@ def train(train_loader, valid_loader, weight_init=None):
 	:param valid_loader: Dataloader for validation set
 	:param weight_init: Initialization method for model parameters
 	"""
-	
+	device = torch.device("cuda:0" if (config.USE_CUDA and torch.cuda.is_available()) else "cpu")
+	print("Using device {} for training".format(device))
 	# Initialize the model, training criterion and optimizer
-	model = MSCNN(config.N_TAGS)
+	model = MSCNN(config.N_TAGS).to(device)
 	if weight_init is not None:
-		model.apply(weight_init)
+		model.apply(weight_init) # Initialize parameters with xavier normal
 	criterion = nn.BCELoss()
 	optimizer = optim.Adam(model.parameters(), lr=config.LR, weight_decay=config.L2)
 
@@ -52,40 +55,44 @@ def train(train_loader, valid_loader, weight_init=None):
 		start_it = time.time()
 		
 		# Train
+		print("Epoch {}".format(epoch))
 		error = []
 		for i, data in enumerate(train_loader, 0):
 			optimizer.zero_grad()
-			inputs = data['spectrogram']
-			targets = data['tags']
+			inputs = data['spectrogram'].to(device)
+			targets = data['tags'].to(device)
 			# forward + backward + optimize
 			predictions = torch.sigmoid(model(inputs))
 			loss = criterion(predictions, targets)
-			error.append(loss)
+			error.append(loss.data)
 			loss.backward()
 			optimizer.step()
-		print("Epoch {}".format(epoch))
-		print("Training cost is: {}".format(np.mean(error)))
+		print("\tTraining cost is: {}".format(np.mean(error)))
 		
 		# Evaluate on validation set
 		model.eval()
 		with torch.no_grad():
 			test_predictions = []
+			valid_targets = []
 			for i, data in enumerate(valid_loader, 0):
-				inputs = data['spectrogram']
-				targets = data['tags']
+				inputs = data['spectrogram'].to(device)
+				targets = data['tags'].to(device)
 				predictions = torch.sigmoid(model(inputs))
-				predictions = torch.round(predictions) ##################### Check if this _has_ to be done
-				# Append predictions to test_predictions here
-				test_predictions.append(___________________)#########################
-
-			# Evaluate with ROC AUC score here
-			valid_score = 0 # Edit here ###########################
-			print("Validation AUC score is: {}".format(valid_score))
+				if i == 0:
+					test_predictions = predictions
+					valid_targets = targets
+				else:
+					test_predictions = np.append(test_predictions, predictions, axis=0)
+					valid_targets = np.append(valid_targets, targets, axis=0)
+			
+			valid_score = roc_auc_score(valid_targets, test_predictions, average="macro")
+			print("\tValidation AUC score is: {}".format(valid_score))
 			if valid_score > best:
 				best = valid_score
 				torch.save(model, config.DATA_PATH + "TrainedModel.pickle")
+		
 		end_it = time.time()
-		print("Time for {} iteration: {} seconds".format(i, end_it - start_it))
+		print("\tTime for {} iteration: {} seconds".format(epoch, end_it - start_it))
 
 	end = time.time()
 	print("Best validation score: {}".format(best))
@@ -94,15 +101,15 @@ def train(train_loader, valid_loader, weight_init=None):
 
 if __name__ == "__main__":
 	# Load data
-	tag_freqs, tag_names, vectors = pickle.load(open(config.DATA_PATH + "annotations.csv", "rb"))
-	spectrograms = np.load(open(config.DATA + "Spectrograms.data", "rb"))
+	tag_freqs, tag_names, vectors = pickle.load(open(config.DATA_PATH + "annotations.pickle", "rb"))
+	spectrograms = np.load(open(config.DATA_PATH + "Spectrograms.data", "rb"))
 
 	# Preprocessing
 	vectors = np.delete(vectors, config.DELETE, axis=0)
-	spectrograms = np.delete(vectors, config.DELETE, axis=0)
+	spectrograms = np.delete(spectrograms, config.DELETE, axis=0)
 	shuffle_indx = np.arange(vectors.shape[0])
 	np.random.shuffle(shuffle_indx)
-	vectors = vectors[shuffle_indx][:, :config.N_TAGS]
+	vectors = vectors[shuffle_indx][:, :config.N_TAGS].astype(np.float32)
 	spectrograms = np.expand_dims(spectrograms[shuffle_indx], axis=1) # For channel
 
 	# Load training data
@@ -114,7 +121,7 @@ if __name__ == "__main__":
 
 	# Load validation data
 	valid_inps = spectrograms[config.TRAIN_SIZE: config.TRAIN_SIZE + config.VALIDATION_SIZE]
-	valid_targets = spectrograms[config.TRAIN_SIZE: config.TRAIN_SIZE + config.VALIDATION_SIZE]
+	valid_targets = vectors[config.TRAIN_SIZE: config.TRAIN_SIZE + config.VALIDATION_SIZE]
 	valid_set = MusicDataset(valid_inps, valid_targets, task="validation")
 	valid_loader = DataLoader(valid_set, batch_size=config.VALIDATION_BATCH_SIZE, shuffle=False, num_workers=2)
 

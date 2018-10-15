@@ -6,31 +6,44 @@ import os
 import csv
 import config
 
-def filter_tags(n_tags, annotations_file_path, write_path):
+def read_annotations(annotations_file_path):
 	"""
 	Prunes tags by frequency
-	:param n_tags: Number of tags to be retained
 	:param annotations_file_path: Path of original annotations file
-	:param write_path: Path of file to dump the filtered annotations
+	:return: IDs of data instances, Names of tags, frequencies of tags, tags annotations for data, paths of audio
+	clips (all in decreasing order of tag frequencies)
 	"""
-	print("Filtering top " + str(n_tags) + " tags...")
+	print("Reading raw annotations...")
 	ids = []
+	names = []
 	tags = np.empty((0, 188), dtype="<U1")
 	paths = []
 	with open(annotations_file_path) as csv_file:
 		csv_reader = csv.reader(csv_file, delimiter="\t")
-		next(csv_reader) # Skip the header
+		names =  np.array(next(csv_reader)[1:189])
 		for row in csv_reader:
 			ids.append(int(row[0]))
 			tags = np.append(tags, [row[1:189]], axis=0)
 			paths.append(row[189])
 	tags = tags.astype(int)
 	freq = np.sum(tags, axis=0)
-	tags = tags[:, freq.argsort()[-1 * n_tags:][::-1].tolist()]
-	pickle.dump((ids, tags, paths), open(write_path, "wb"))
+	print(len(ids), names.shape, freq.shape, tags.shape, len(paths))
+	print("Done")
+	return ids, names, freq, tags, paths
+
+def generate_annotations(names, freq, tags, write_path):
+	"""
+	Generates a custom annotations file
+	:param names: Names of tags
+	:param freq: Frequencies of tags
+	:param write_path: File to write custom annotations to
+	"""
+	print("Generating processed annotations file...")
+	sorted_indices = freq.argsort()[::-1]
+	pickle.dump((freq[sorted_indices], names[sorted_indices], tags[:, sorted_indices]), open(write_path, "wb"))
 	print("Done")
 
-def generate_spectrograms(file_paths, ind, checkpoint, print_every=100, use_numpy=True, compress=False):
+def generate_spectrograms(file_paths, spec_path, print_every=100, use_numpy=True, compress=False):
 	"""
 	Generates spectrograms for audio data
 	:param file_paths: List of paths of audio files
@@ -43,7 +56,7 @@ def generate_spectrograms(file_paths, ind, checkpoint, print_every=100, use_nump
 	count = 0
 	for index, path in enumerate(file_paths):
 	    count += 1
-	    if (checkpoint + index) in config.DELETE:
+	    if (index) in config.DELETE:
 	        specs.append(np.zeros((128, 628), dtype=np.float32))
 	        continue
 	    signal, rate = librosa.load("data/" + path, sr=config.SR)
@@ -53,7 +66,6 @@ def generate_spectrograms(file_paths, ind, checkpoint, print_every=100, use_nump
 	print("Done: " + str(count))
 	specs = np.array(specs)
 	print("Dumping spectrograms....")
-	spec_path = config.DATA_PATH + "Spectrograms" + str(ind) + ".data"
 	if not use_numpy:
 	    pickle.dump(specs, gzip.open(spec_path, "wb") if compress else open(spec_path, "wb"))
 	else:
@@ -66,20 +78,10 @@ def generate_spectrograms(file_paths, ind, checkpoint, print_every=100, use_nump
 if __name__ == "__main__":
 
 	# Load annotations
-	filtered_annotations_file = config.DATA_PATH + "annotations_final_" + str(config.N_TAGS) + ".pickle"
-	if not os.path.exists(filtered_annotations_file):
-		filter_tags(config.N_TAGS, config.ANNOTATIONS_PATH, filtered_annotations_file)
-	print("Loading annotations....")
-	ids, tags, paths = pickle.load(open(filtered_annotations_file, "rb"))
-	print("Done")
+	_, names, freq, tags, paths = read_annotations(config.ANNOTATIONS_PATH)
+
+	# Generate custom annotations file
+	generate_annotations(names, freq, tags, config.DATA_PATH + "annotations.pickle")
 
 	# Generate Spectrograms
-	# generate_spectrograms(paths)
-
-	checkpoints = [0, 5000, 10000, 15000, 20000, 25000, 25863]
-	# Generate Spectrograms
-	for ind, checkpoint in enumerate(checkpoints[:-1]):
-		if ind < 4:
-			continue
-		print(ind, checkpoint, checkpoints[ind + 1], ":")
-		generate_spectrograms(paths[checkpoint: checkpoints[ind + 1]], ind + 1, checkpoint)
+	generate_spectrograms(paths, config.DATA_PATH + "Spectrograms.data")
