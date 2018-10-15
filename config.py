@@ -1,18 +1,21 @@
 DELETE = [16250, 24867, 25546] # Problematic files
-N_TAGS = 50 # Number of output tags
 
 # For Spectrogram generator
 DATA_PATH = "data/"
-ANNOTATIONS_PATH = DATA_PATH + "annotations_final.csv"
+ANNOTATIONS_PATH = DATA_PATH + "annotations_final.csv" # Raw annotations file
 SR = 11025 # Sampling Rate
 EPS = 1e-20 # For log clipping
 
 # Training parameters
+N_TAGS = 50 # Number of output tags
 USE_CUDA = True
-LR = 0.0001 # Learning rate
-BATCH_SIZE = 20
-TRAIN_SIZE = 20000
-VALIDATION_SIZE = 5800 # Size of validation set
 EPOCHS = 100
-VALIDATION_BATCH_SIZE = 20
 L2 = 0.0001
+LR = 0.0001 # Learning rate
+
+TRAIN_SIZE = 19775
+BATCH_SIZE = 20
+VALIDATION_SIZE = 1520
+VALIDATION_BATCH_SIZE = 20
+TEST_SIZE = 4565
+TEST_BATCH_SIZE = 20
