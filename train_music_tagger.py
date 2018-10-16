@@ -119,7 +119,7 @@ def train(train_loader, valid_loader, test_loader, device, weight_init=None):
 
 if __name__ == "__main__":
 	# Load data
-	tag_freqs, tag_names, vectors = pickle.load(open(config.DATA_PATH + "annotations.pickle", "rb"))
+	tag_freqs, tag_names, vectors = pickle.load(open(config.DATA_PATH + "annotations_cleaned.pickle", "rb"))
 	spectrograms = np.load(open(config.DATA_PATH + "Spectrograms.data", "rb"))
 
 	# Preprocessing and shuffling
@@ -150,6 +150,10 @@ if __name__ == "__main__":
 	test_targets = vectors[start_pad: start_pad + config.TEST_SIZE]
 	test_set = MusicDataset(test_inps, test_targets)
 	test_loader = DataLoader(test_set, batch_size=config.TEST_BATCH_SIZE, shuffle=False, num_workers=2)
+
+	# Clearing some memory
+	del spectrograms
+	del vectors
 
 	# Train model
 	device = torch.device("cuda:0" if (config.USE_CUDA and torch.cuda.is_available()) else "cpu")
